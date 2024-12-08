@@ -4,7 +4,7 @@ class Us30sController < ApplicationController
   def preluare_us30
     Us30.delete_all
     ActiveRecord::Base.connection.reset_pk_sequence!('us30s')
-    
+  
     # Calea către fișierul Excel
     xlsx = Roo::Spreadsheet.open(File.join(Rails.root, 'app', 'fisierele', 'US30.xlsx'))
   
@@ -24,11 +24,6 @@ class Us30sController < ApplicationController
       close = row[5]&.value.to_d     # Prețul de închidere
       volume = row[6]&.value.to_d    # Volumul
   
-      # Debugging: Afișează valorile individuale extrase
-      puts "Data extrasă: #{date.inspect}"
-      puts "Timestamp brut extras: #{raw_time.inspect}"
-      puts "Preț Open: #{open.inspect}, High: #{high.inspect}, Low: #{low.inspect}, Close: #{close.inspect}, Volume: #{volume.inspect}"
-  
       # Sari peste rând dacă vreun câmp esențial lipsește
       if date.blank? || raw_time.blank? || open.blank? || high.blank? || low.blank? || close.blank? || volume.blank?
         puts "Rând sărit: Lipsesc date esențiale."
@@ -40,39 +35,22 @@ class Us30sController < ApplicationController
         formatted_date = Date.strptime(date, '%Y%m%d')
   
         # Tratarea timestamp-ului
-        if raw_time.is_a?(Numeric)
-          # Excel stochează timpul în secunde de la 00:00
-          total_seconds = raw_time.to_i
-          hours = total_seconds / 3600
-          minutes = (total_seconds % 3600) / 60
-          seconds = total_seconds % 60
-          time_string = format("%02d:%02d:%02d", hours, minutes, seconds)
-          parsed_time = Time.parse(time_string)
-          puts "Timestamp convertit din numeric: #{parsed_time}"
-        elsif raw_time.is_a?(String) && raw_time.include?(":")
-          # Format text din Excel
-          begin
-            parsed_time = Time.strptime(raw_time.strip, "%H:%M:%S")
-            puts "Timestamp convertit din string: #{parsed_time}"
-          rescue ArgumentError
-            # Încearcă formatul AM/PM dacă cel de mai sus eșuează
-            parsed_time = Time.strptime(raw_time.strip, "%I:%M:%S %p")
-            puts "Timestamp convertit din AM/PM string: #{parsed_time}"
-          end
-        else
-          # Format necunoscut
-          raise ArgumentError, "Format necunoscut pentru timestamp: #{raw_time.inspect}"
-        end
+        parsed_time = if raw_time.is_a?(Numeric)
+                        # Excel stochează timpul ca număr de secunde de la 00:00
+                        Time.at(raw_time.to_i).strftime("%H:%M:%S")
+                      elsif raw_time.is_a?(String) && raw_time.include?(":")
+                        # Direct string în format HH:MM:SS
+                        raw_time.strip
+                      else
+                        raise ArgumentError, "Format necunoscut pentru timestamp: #{raw_time.inspect}"
+                      end
       rescue ArgumentError => e
         puts "Eroare la parsarea timestamp-ului: #{e.message}. Rând sărit."
         next
       end
   
-      # Debugging: Afișează valorile gata de inserat
-      puts "Valorile finale pentru inserare: Date=#{formatted_date}, Time=#{parsed_time}, Open=#{open}, High=#{high}, Low=#{low}, Close=#{close}, Volume=#{volume}"
-  
       # Verifică dacă înregistrarea există deja în tabel
-      if Us30.exists?(date: formatted_date, timestamp: parsed_time.strftime("%H:%M:%S"))
+      if Us30.exists?(date: formatted_date, timestamp: parsed_time)
         puts "Înregistrarea există deja: #{formatted_date} #{parsed_time}."
         next
       end
@@ -80,7 +58,7 @@ class Us30sController < ApplicationController
       # Creează o nouă înregistrare în tabel
       us30 = Us30.new(
         date: formatted_date,
-        timestamp: parsed_time.strftime("%H:%M:%S"),
+        timestamp: parsed_time,
         open: open,
         high: high,
         low: low,
@@ -95,9 +73,10 @@ class Us30sController < ApplicationController
         puts "Eroare la salvarea înregistrării: #{us30.errors.full_messages.join(', ')}"
       end
     end
-    
+  
     redirect_to home_preluare_path
   end
+  
   
   def preluare_us30_cu_duplicat
     # Calea către fișierul Excel
