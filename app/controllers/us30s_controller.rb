@@ -1,6 +1,6 @@
 class Us30sController < ApplicationController
   before_action :set_us30, only: %i[ show edit update destroy ]
-
+  #
   def preluare_us30
     Us30.delete_all
     ActiveRecord::Base.connection.reset_pk_sequence!('us30s')
