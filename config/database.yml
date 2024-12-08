@@ -1,0 +1,28 @@
+default: &default
+  adapter: postgresql
+  encoding: unicode
+  # For details on connection pooling, see Rails configuration guide
+  # https://guides.rubyonrails.org/configuring.html#database-pooling
+  pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
+
+
+development:
+  <<: *default
+  database: fx_development
+  adapter: postgresql
+  encoding: utf8
+  username: postgres
+  password: 1
+  pool: 5 # not mandatory
+  timeout: 5000 # not mandatory
+  host: localhost
+  port: 5432
+
+test:
+  <<: *default
+  database: fx_test
+  adapter: postgresql
+  encoding: unicode
+  pool: 5
+  username: postgres
+  password: 1

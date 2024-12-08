@@ -1,0 +1,2 @@
+module MoneziHelper
+end

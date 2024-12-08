@@ -1,0 +1,13 @@
+<h1>Preluare</h1> 
+<h1>Comenzi pentru copiere Baza de date:</h1> 
+<h4>In cmd C:\fx pentru a obtine BD existenta in format fx_development.sql dau comanda:</h4>
+<h5>pg_dump -U postgres -d fx_development -F p --clean --if-exists -f fx_development.sql</h5>
+
+<h4>In cmd C:\fx pentru a instala noua BD este necesar sa am fisierul fx_development.sql in folderul fx si apoi dau comanda:</h4>
+<h5>psql -U postgres -d fx_development < fx_development.sql</h5>
+
+<%= link_to 'Mergi la Home', root_path, class: 'btn btn-primary' %><br><br>
+<%= link_to 'Importă Date din Excel US30 - data si timp unice', '#', class: 'btn btn-primary disabled' %><br><br> 
+<%= link_to 'Importă Date din Excel US30 in continuare...', '#', class: 'btn btn-secondary disabled' %><br><br>
+<%= link_to 'Importă Date din Excel BTC', '#', class: 'btn btn-primary disabled' %><br><br>
+

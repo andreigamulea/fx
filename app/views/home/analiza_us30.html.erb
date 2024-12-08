@@ -1,0 +1,20 @@
+<h1>Analiza US30</h1>
+
+<p>Selectează orele pentru analiza zilnică:</p>
+
+<%= form_with url: home_analiza_us30_tabel_path, method: :post, local: true, data: { turbo: false } do |f| %>
+    <div>
+      <%= f.label :ora_inceput, "Ora de început:" %>
+      <%= f.time_select :ora_inceput, default: { hour: 0, minute: 0 } %>
+    </div>
+  
+    <div>
+      <%= f.label :ora_sfarsit, "Ora de sfârșit:" %>
+      <%= f.time_select :ora_sfarsit, default: { hour: 23, minute: 59 } %>
+    </div>
+  
+    <div>
+      <%= f.submit "Analizează", class: 'btn btn-primary' %>
+    </div>
+  <% end %>
+  <%= link_to 'Pagina Principală', root_path %><br><br>
