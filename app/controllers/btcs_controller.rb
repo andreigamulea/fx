@@ -87,6 +87,7 @@ class BtcsController < ApplicationController
     puts "Fișier Excel deschis cu succes. Încep procesarea rândurilor..."
   
     records = []
+    existing_records = Set.new # Utilizăm un set pentru a păstra combinațiile unice de date și timestamp
     batch_size = 10_000 # Lot de 10.000 de rânduri
   
     xlsx.each_row_streaming(offset: 1, pad_cells: true) do |row|
@@ -104,6 +105,15 @@ class BtcsController < ApplicationController
   
       formatted_date = Date.strptime(date, '%Y%m%d')
       parsed_time = raw_time.is_a?(Numeric) ? Time.at(raw_time.to_i).strftime("%H:%M:%S") : raw_time.strip
+  
+      # Verifică dacă înregistrarea este duplicată
+      unique_key = "#{formatted_date}-#{parsed_time}"
+      if existing_records.include?(unique_key)
+        puts "Rând duplicat detectat: Data=#{formatted_date}, Timestamp=#{parsed_time}. Rând sărit."
+        next
+      end
+  
+      existing_records.add(unique_key)
   
       records << Btc.new(
         date: formatted_date,
@@ -129,6 +139,7 @@ class BtcsController < ApplicationController
     puts "Import complet."
     redirect_to home_preluare_path
   end
+  
   
   
   
