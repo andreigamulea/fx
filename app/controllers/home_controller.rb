@@ -37,30 +37,27 @@ class HomeController < ApplicationController
       @ora_inceput = ora_inceput.strftime('%H:%M')
       @ora_sfarsit = ora_sfarsit.strftime('%H:%M')
   
-      # Obținem toate zilele distincte din tabel
-      zile = Us30.select(:date).distinct.order(:date)
-  
-      @rezultate = zile.map do |zi|
-        # Filtrăm datele pentru ziua respectivă și intervalul calculat
-        interval = Us30
-                     .where(date: zi.date)
+      # Interogare optimizată care grupează datele pe zile și aplică condițiile
+      @rezultate = Us30
                      .where("timestamp::time >= ? AND timestamp::time <= ?", @ora_inceput, @ora_sfarsit)
-                     .select("MIN(low) as min_low, MAX(high) as max_high")
-                     .take
-  
-        {
-          date: zi.date,
-          min_low: interval&.min_low || "N/A",
-          max_high: interval&.max_high || "N/A",
-          ora_inceput: @ora_inceput,
-          ora_sfarsit: @ora_sfarsit
-        }
-      end
+                     .select("date, MIN(low) as min_low, MAX(high) as max_high")
+                     .group(:date)
+                     .order(:date)
+                     .map do |rezultat|
+                       {
+                         date: rezultat.date,
+                         min_low: rezultat.min_low || "N/A",
+                         max_high: rezultat.max_high || "N/A",
+                         ora_inceput: @ora_inceput,
+                         ora_sfarsit: @ora_sfarsit
+                       }
+                     end
     end
   
     # Render către view
     render :analiza_us30_tabel
   end
+  
   
   
   def analiza_btc
