@@ -1,8 +1,9 @@
 <h1>Rezultatele Analizei BTC</h1>
-<%= link_to 'Pagina Principală', root_path %><br><br>
-<p>Ora de început selectată: <%= @ora_inceput %></p>
-<p>Ora de sfârșit selectată: <%= @ora_sfarsit %></p>
+<%= link_to 'Pagina Principală', root_path, class: "btn btn-secondary mb-3" %>
 
+<p><strong>Ora de început selectată:</strong> <%= @ora_inceput %></p>
+<p><strong>Ora de sfârșit selectată:</strong> <%= @ora_sfarsit %></p>
+<%= link_to 'Înapoi la formular', home_analiza_btc_path, class: 'btn btn-secondary mt-3' %><br>
 <% if @rezultate.any? %>
   <h2>Minim și Maxim pentru fiecare zi BTC</h2>
   <div class="table-responsive">
@@ -11,6 +12,8 @@
         <tr>
           <th>#</th>
           <th>Data</th>
+          <th>Ora început</th>
+          <th>Ora sfârșit</th>
           <th>Minim (low)</th>
           <th>Maxim (high)</th>
         </tr>
@@ -19,9 +22,11 @@
         <% @rezultate.each_with_index do |rezultat, index| %>
           <tr>
             <td><%= index + 1 %></td>
-            <td><%= rezultat.date %></td>
-            <td><%= rezultat.min_low %></td>
-            <td><%= rezultat.max_high %></td>
+            <td><%= rezultat[:date] %></td>
+            <td><%= rezultat[:ora_inceput] %></td>
+            <td><%= rezultat[:ora_sfarsit] %></td>
+            <td><%= rezultat[:min_low] %></td>
+            <td><%= rezultat[:max_high] %></td>
           </tr>
         <% end %>
       </tbody>
@@ -31,5 +36,4 @@
   <p class="alert alert-warning">Nu s-au găsit înregistrări pentru intervalul selectat.</p>
 <% end %>
 
-<%= link_to 'Înapoi la formular', home_analiza_btc_path, class: 'btn btn-secondary mt-3' %><br><br>
-<%= link_to 'Pagina Principală', root_path %><br><br>
+<%= link_to 'Înapoi la formular', home_analiza_btc_path, class: 'btn btn-secondary mt-3' %>
