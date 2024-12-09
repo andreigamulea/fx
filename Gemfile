@@ -47,6 +47,7 @@ gem "jbuilder"
 gem "tzinfo-data", platforms: %i[ mingw mswin x64_mingw jruby ]
 gem 'rubyXL', '~> 3.4', '>= 3.4.25'
 gem 'roo', '~> 2.10'
+gem 'activerecord-import', '~> 1.8', '>= 1.8.1'
 # Reduces boot times through caching; required in config/boot.rb
 gem "bootsnap", require: false
 
