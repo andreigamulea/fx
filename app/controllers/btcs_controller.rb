@@ -81,43 +81,27 @@ class BtcsController < ApplicationController
     Btc.delete_all
     ActiveRecord::Base.connection.reset_pk_sequence!('btcs')
   
-    # Calea către fișierul Excel
     xlsx = Roo::Spreadsheet.open(File.join(Rails.root, 'app', 'fisierele', 'BTCUSD.xlsx'))
   
     puts "Fișier Excel deschis cu succes. Încep procesarea rândurilor..."
   
     records = []
+    batch_size = 1000 # Numărul de rânduri per lot
   
-    # Iterează prin fiecare rând din fișier, pornind de la al doilea rând (pentru a sări header-ul)
     xlsx.each_row_streaming(offset: 1, pad_cells: true) do |row|
-      # Extrage valorile din rând
-      date = row[0]&.value.to_s.strip # Data în format YYYYMMDD
-      raw_time = row[1]&.value       # Ora brută (numerică sau text)
-      open = row[2]&.value.to_d      # Prețul de deschidere
-      high = row[3]&.value.to_d      # Prețul maxim
-      low = row[4]&.value.to_d       # Prețul minim
-      close = row[5]&.value.to_d     # Prețul de închidere
-      volume = row[6]&.value.to_d    # Volumul
+      date = row[0]&.value.to_s.strip
+      raw_time = row[1]&.value
+      open = row[2]&.value.to_d
+      high = row[3]&.value.to_d
+      low = row[4]&.value.to_d
+      close = row[5]&.value.to_d
+      volume = row[6]&.value.to_d
   
-      # Sari peste rând dacă vreun câmp esențial lipsește
       next if date.blank? || raw_time.blank? || open.blank? || high.blank? || low.blank? || close.blank? || volume.blank?
   
-      begin
-        # Convertim data și ora în formatul corect
-        formatted_date = Date.strptime(date, '%Y%m%d')
-        parsed_time = if raw_time.is_a?(Numeric)
-                        # Timp numeric
-                        Time.at(raw_time.to_i).strftime("%H:%M:%S")
-                      else
-                        # Format text
-                        raw_time.strip
-                      end
-      rescue ArgumentError => e
-        puts "Eroare la parsarea timestamp-ului: #{e.message}. Rând sărit."
-        next
-      end
+      formatted_date = Date.strptime(date, '%Y%m%d')
+      parsed_time = raw_time.is_a?(Numeric) ? Time.at(raw_time.to_i).strftime("%H:%M:%S") : raw_time.strip
   
-      # Adaugă rândul în lista de înregistrări
       records << Btc.new(
         date: formatted_date,
         timestamp: parsed_time,
@@ -127,18 +111,21 @@ class BtcsController < ApplicationController
         close: close,
         volume: volume
       )
+  
+      if records.size >= batch_size
+        Btc.import(records)
+        records.clear
+        puts "Lot importat."
+      end
     end
   
-    # Importă toate înregistrările odată
-    if records.any?
-      Btc.import(records)
-      puts "Import complet: #{records.size} rânduri au fost salvate."
-    else
-      puts "Nicio înregistrare validă pentru import."
-    end
+    # Importă orice rânduri rămase
+    Btc.import(records) if records.any?
   
+    puts "Import complet."
     redirect_to home_preluare_path
   end
+  
   
   
   
