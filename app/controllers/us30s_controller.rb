@@ -78,6 +78,62 @@ class Us30sController < ApplicationController
   end
   
   
+
+  def preluare_us301
+    Us30.delete_all
+    ActiveRecord::Base.connection.reset_pk_sequence!('us30s')
+  
+    # Calea către fișierul Excel
+    xlsx = Roo::Spreadsheet.open(File.join(Rails.root, 'app', 'fisierele', 'US30.xlsx'))
+  
+    puts "Fișier Excel deschis cu succes. Încep procesarea rândurilor..."
+  
+    records = []
+    batch_size = 10_000 # Lot de 10.000 de rânduri
+  
+    xlsx.each_row_streaming(offset: 1, pad_cells: true) do |row|
+      # Extrage valorile din rând
+      date = row[0]&.value.to_s.strip # Data în format YYYYMMDD
+      raw_time = row[1]&.value       # Ora brută (numerică sau text)
+      open = row[2]&.value.to_d      # Prețul de deschidere
+      high = row[3]&.value.to_d      # Prețul maxim
+      low = row[4]&.value.to_d       # Prețul minim
+      close = row[5]&.value.to_d     # Prețul de închidere
+      volume = row[6]&.value.to_d    # Volumul
+  
+      # Sari peste rând dacă vreun câmp esențial lipsește
+      next if date.blank? || raw_time.blank? || open.blank? || high.blank? || low.blank? || close.blank? || volume.blank?
+  
+      formatted_date = Date.strptime(date, '%Y%m%d')
+      parsed_time = raw_time.is_a?(Numeric) ? Time.at(raw_time.to_i).strftime("%H:%M:%S") : raw_time.strip
+  
+      records << Us30.new(
+        date: formatted_date,
+        timestamp: parsed_time,
+        open: open,
+        high: high,
+        low: low,
+        close: close,
+        volume: volume
+      )
+  
+      # Când lotul ajunge la 10.000 de rânduri, importă și resetează lista
+      if records.size >= batch_size
+        Us30.import(records)
+        records.clear
+        puts "Lot de 10.000 de rânduri importat cu succes."
+      end
+    end
+  
+    # Importă orice rânduri rămase după ultima iterare
+    Us30.import(records) if records.any?
+  
+    puts "Import complet."
+    redirect_to home_preluare_path
+  end
+  
+
+
   def preluare_us30_cu_duplicat
     # Calea către fișierul Excel
     xlsx = Roo::Spreadsheet.open(File.join(Rails.root, 'app', 'fisierele', 'US30.xlsx'))

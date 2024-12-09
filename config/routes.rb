@@ -1,5 +1,6 @@
 Rails.application.routes.draw do
   get '/us30s/preluare_us30', to: 'us30s#preluare_us30', as: 'preluare_us30_us30s'
+  get '/us30s/preluare_us301', to: 'us30s#preluare_us301', as: 'preluare_us30_us301s'
   get '/us30s/preluare_us30_cu_duplicat', to: 'us30s#preluare_us30_cu_duplicat', as: 'preluare_us30_cu_duplicat_us30s'
   get '/btcs/preluare_btc', to: 'btcs#preluare_btc', as: 'preluare_btc_btcs'
   get '/btcs/preluare_btc1', to: 'btcs#preluare_btc1', as: 'preluare_btc_btcs1'

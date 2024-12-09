@@ -81,14 +81,16 @@ class BtcsController < ApplicationController
     Btc.delete_all
     ActiveRecord::Base.connection.reset_pk_sequence!('btcs')
   
+    # Calea către fișierul Excel
     xlsx = Roo::Spreadsheet.open(File.join(Rails.root, 'app', 'fisierele', 'BTCUSD.xlsx'))
   
     puts "Fișier Excel deschis cu succes. Încep procesarea rândurilor..."
   
     records = []
-    batch_size = 1000 # Numărul de rânduri per lot
+    batch_size = 10_000 # Lot de 10.000 de rânduri
   
     xlsx.each_row_streaming(offset: 1, pad_cells: true) do |row|
+      # Extrage valorile din rând
       date = row[0]&.value.to_s.strip
       raw_time = row[1]&.value
       open = row[2]&.value.to_d
@@ -97,6 +99,7 @@ class BtcsController < ApplicationController
       close = row[5]&.value.to_d
       volume = row[6]&.value.to_d
   
+      # Sari peste rând dacă vreun câmp esențial lipsește
       next if date.blank? || raw_time.blank? || open.blank? || high.blank? || low.blank? || close.blank? || volume.blank?
   
       formatted_date = Date.strptime(date, '%Y%m%d')
@@ -112,14 +115,15 @@ class BtcsController < ApplicationController
         volume: volume
       )
   
+      # Când lotul ajunge la 10.000 de rânduri, importă și resetează lista
       if records.size >= batch_size
         Btc.import(records)
         records.clear
-        puts "Lot importat."
+        puts "Lot de 10.000 de rânduri importat cu succes."
       end
     end
   
-    # Importă orice rânduri rămase
+    # Importă orice rânduri rămase după ultima iterare
     Btc.import(records) if records.any?
   
     puts "Import complet."
