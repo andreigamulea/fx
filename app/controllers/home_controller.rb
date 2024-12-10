@@ -78,6 +78,7 @@ class HomeController < ApplicationController
   
         # Adăugare logică pentru câmpul "Atins"
         atins = "N/A"
+        closing_time = nil
         in_process = false
         process_type = nil
   
@@ -107,37 +108,39 @@ class HomeController < ApplicationController
   
           # Pas 2: Continuăm analiza pe direcția stabilită
           if process_type == 'buy'
-            # Verificăm TP pentru Buy Logic
             if row.high >= tp_buy_stop
               atins = "Buy1"
+              closing_time = row.timestamp
               puts "Atins: Buy1"
               break
             elsif row.low <= sl_buy
-              # Continuăm să căutăm TP sau SL
               if row.high >= tp_sx7
                 atins = "Sell2"
+                closing_time = row.timestamp
                 puts "Atins: Sell2"
                 break
               elsif row.high <= sl_sx7
                 atins = "SL"
+                closing_time = row.timestamp
                 puts "Atins: SL"
                 break
               end
             end
           elsif process_type == 'sell'
-            # Verificăm TP pentru Sell Logic
             if row.low <= tp_sell_stop
               atins = "Sell1"
+              closing_time = row.timestamp
               puts "Atins: Sell1"
               break
             elsif row.high >= sl_sell
-              # Continuăm să căutăm TP sau SL
               if row.low <= tp_bx7
                 atins = "Buy2"
+                closing_time = row.timestamp
                 puts "Atins: Buy2"
                 break
               elsif row.low >= sl_bx7
                 atins = "SL"
+                closing_time = row.timestamp
                 puts "Atins: SL"
                 break
               end
@@ -162,7 +165,8 @@ class HomeController < ApplicationController
           entry_sx7: entry_sx7 || "N/A",
           sl_sx7: sl_sx7 || "N/A",
           tp_sx7: tp_sx7 || "N/A",
-          atins: atins
+          atins: atins,
+          closing_time: closing_time ? closing_time.strftime('%H:%M:%S') : "N/A"
         }
       end
     end
@@ -170,6 +174,8 @@ class HomeController < ApplicationController
     # Render către view
     render :analiza_us30_tabel
   end
+  
+  
   
   
   
