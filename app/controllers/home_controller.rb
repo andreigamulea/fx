@@ -17,7 +17,7 @@ class HomeController < ApplicationController
       @coeficient = nil
       @rezultate = []
     elsif request.post?
-      # Preluare date din formular
+      # 1. Preluare date din formular
       ora_inceput = Time.new(
         params["[ora_inceput(1i)]"].to_i,
         params["[ora_inceput(2i)]"].to_i,
@@ -44,136 +44,294 @@ class HomeController < ApplicationController
   
       coeficient = params[:coeficient].to_f
   
-      # Setăm variabilele pentru view
       @ora_inceput = ora_inceput.strftime('%H:%M')
       @ora_sfarsit = ora_sfarsit.strftime('%H:%M')
       @ora_pivot = ora_pivot.strftime('%H:%M')
       @coeficient = coeficient
   
-      # Interogare bază de date și calcul
-      @rezultate = Us30
-                     .where("timestamp::time >= ? AND timestamp::time <= ?", @ora_inceput, @ora_sfarsit)
-                     .select("date, MIN(low) as min_low, MAX(high) as max_high")
-                     .group(:date)
-                     .order(:date)
-                     .map do |rezultat|
-        # Calcul valori inițiale
-        max_high = rezultat.max_high || 0
-        min_low = rezultat.min_low || 0
-        adaos = (max_high - min_low) * coeficient
-        tp_buy_stop = max_high + adaos
-        tp_sell_stop = min_low - adaos
-        entry_sell = min_low - 3
-        entry_buy = max_high + 3
-        sl_sell = max_high + 6
-        sl_buy = min_low - 6
+      # Prima baleiere: date zilnice agregate
+      rezultate_initiale = Us30
+        .where("timestamp::time >= ? AND timestamp::time <= ?", @ora_inceput, @ora_sfarsit)
+        .select("date, MIN(low) as min_low, MAX(high) as max_high")
+        .group(:date)
+        .order(:date)
+        .map do |rezultat|
+          max_high = rezultat.max_high || 0
+          min_low = rezultat.min_low || 0
+          adaos = (max_high - min_low) * coeficient
+          {
+            date: rezultat.date,
+            min_low: min_low,
+            max_high: max_high,
+            tp_buy_stop: max_high + adaos,
+            tp_sell_stop: min_low - adaos,
+            entry_sell: min_low - 3,
+            entry_buy: max_high + 3,
+            sl_sell: max_high + 6,
+            sl_buy: min_low - 6,
+            entry_bx7: max_high + 6,
+            sl_bx7: (min_low - 3),
+            tp_bx7: (max_high + 6) + (adaos / 2.5),
+            entry_sx7: (min_low - 6),
+            sl_sx7: (max_high + 3),
+            tp_sx7: (min_low - 6) - (adaos / 2.5)
+          }
+        end
   
-        # Calcul pentru noile câmpuri
-        entry_bx7 = sl_sell
-        sl_bx7 = entry_sell
-        tp_bx7 = sl_sell + (adaos / 2.5)
-        entry_sx7 = sl_buy
-        sl_sx7 = entry_buy
-        tp_sx7 = sl_buy - (adaos / 2.5)
+      if rezultate_initiale.empty?
+        @rezultate = []
+        render :analiza_us30_tabel and return
+      end
   
-        # Adăugare logică pentru câmpul "Atins"
-        atins = "N/A"
-        closing_time = nil
-        in_process = false
-        process_type = nil
+      # Încărcăm toate datele pe zile
+      start_date = rezultate_initiale.first[:date]
+      end_date = rezultate_initiale.last[:date]
   
-        Us30.where("date = ?", rezultat.date)
-            .where("timestamp::time >= ?", ora_pivot.strftime('%H:%M'))
-            .order(:timestamp)
-            .each do |row|
-          # Logăm valorile analizate pentru debugging
-          puts "Analizăm rândul: High=#{row.high}, Low=#{row.low}, EntryB=#{entry_buy}, EntryS=#{entry_sell}"
+      toate_datele = Us30
+        .where("date >= ? AND date <= ?", start_date, end_date)
+        .order(:date, :timestamp)
   
-          # Pas 1: Determinăm direcția inițială, dacă nu este stabilită
-          if !in_process
-            if row.high >= entry_buy
-              in_process = true
-              process_type = 'buy'
-              puts "Direcția stabilită: BUY"
-            elsif row.low <= entry_sell
-              in_process = true
-              process_type = 'sell'
-              puts "Direcția stabilită: SELL"
-            else
-              # Continuăm să analizăm rânduri dacă nu este clară direcția
-              puts "Nicio direcție stabilită încă. Continuăm."
-              next
+      date_pe_zile = {}
+      toate_datele.each do |row|
+        date_pe_zile[row.date] ||= []
+        date_pe_zile[row.date] << row
+      end
+  
+      # Stocăm rezultatele într-un hash pentru a putea modifica ulterior:
+      daily_data = {}
+      rezultate_initiale.each do |zi|
+        daily_data[zi[:date]] = zi.merge({
+          atins: "N/A",
+          closing_time: "N/A"
+        })
+      end
+  
+      # Stare tranzacție multi-zi
+      tranzactie_deschisa = false
+      process_type = nil
+      conditii_initiale = {}
+      data_deschidere = nil
+  
+      # Vom stoca informații despre tranzacția curentă astfel:
+      # { start_date: Date, atins: ..., closing_dt: DateTime sau nil daca nu s-a inchis }
+      tranzactie_info = {
+        start_date: nil,
+        atins: nil,
+        closing_dt: nil
+      }
+  
+      check_inchidere = lambda do |row, tip, cond|
+        closing_dt = DateTime.parse("#{row.date} #{row.timestamp.strftime('%H:%M:%S')}")
+        if tip == 'buy'
+          if row.high >= cond[:tp_buy_stop]
+            return ["Buy1", closing_dt]
+          elsif row.low <= cond[:sl_buy]
+            if row.high >= cond[:tp_sx7]
+              return ["Sell2", closing_dt]
+            elsif row.high <= cond[:sl_sx7]
+              return ["SL", closing_dt]
             end
           end
-  
-          # Pas 2: Continuăm analiza pe direcția stabilită
-          if process_type == 'buy'
-            if row.high >= tp_buy_stop
-              atins = "Buy1"
-              closing_time = row.timestamp
-              puts "Atins: Buy1"
-              break
-            elsif row.low <= sl_buy
-              if row.high >= tp_sx7
-                atins = "Sell2"
-                closing_time = row.timestamp
-                puts "Atins: Sell2"
-                break
-              elsif row.high <= sl_sx7
-                atins = "SL"
-                closing_time = row.timestamp
-                puts "Atins: SL"
-                break
-              end
-            end
-          elsif process_type == 'sell'
-            if row.low <= tp_sell_stop
-              atins = "Sell1"
-              closing_time = row.timestamp
-              puts "Atins: Sell1"
-              break
-            elsif row.high >= sl_sell
-              if row.low <= tp_bx7
-                atins = "Buy2"
-                closing_time = row.timestamp
-                puts "Atins: Buy2"
-                break
-              elsif row.low >= sl_bx7
-                atins = "SL"
-                closing_time = row.timestamp
-                puts "Atins: SL"
-                break
-              end
+        elsif tip == 'sell'
+          if row.low <= cond[:tp_sell_stop]
+            return ["Sell1", closing_dt]
+          elsif row.high >= cond[:sl_sell]
+            if row.low <= cond[:tp_bx7]
+              return ["Buy2", closing_dt]
+            elsif row.low >= cond[:sl_bx7]
+              return ["SL", closing_dt]
             end
           end
         end
-  
-        # Rezultatul final pentru ziua curentă
-        {
-          date: rezultat.date,
-          min_low: min_low || "N/A",
-          max_high: max_high || "N/A",
-          tp_buy_stop: tp_buy_stop || "N/A",
-          tp_sell_stop: tp_sell_stop || "N/A",
-          entry_sell: entry_sell || "N/A",
-          entry_buy: entry_buy || "N/A",
-          sl_sell: sl_sell || "N/A",
-          sl_buy: sl_buy || "N/A",
-          entry_bx7: entry_bx7 || "N/A",
-          sl_bx7: sl_bx7 || "N/A",
-          tp_bx7: tp_bx7 || "N/A",
-          entry_sx7: entry_sx7 || "N/A",
-          sl_sx7: sl_sx7 || "N/A",
-          tp_sx7: tp_sx7 || "N/A",
-          atins: atins,
-          closing_time: closing_time ? closing_time.strftime('%H:%M:%S') : "N/A"
-        }
+        return nil
       end
-    end
   
-    # Render către view
-    render :analiza_us30_tabel
+      # Faza 1: Analizăm zi cu zi, doar pentru a determina momentul exact al închiderii tranzacțiilor
+      (rezultate_initiale.map{|r| r[:date]}).each do |current_date|
+        zi = daily_data[current_date]
+        minute_curente = date_pe_zile[current_date] || []
+  
+        if tranzactie_deschisa
+          # Avem o tranzacție veche
+          inchisa_inainte_pivot = false
+          inchisa_dupa_pivot = false
+  
+          # Încercăm închiderea
+          minute_curente.each do |row|
+            if row.timestamp.strftime('%H:%M') < @ora_pivot
+              rez = check_inchidere.call(row, process_type, conditii_initiale)
+              if rez
+                # Închisă înainte de pivot
+                tranzactie_info[:atins], tranzactie_info[:closing_dt] = rez
+                # Închidem tranzacția
+                tranzactie_deschisa = false
+                process_type = nil
+                conditii_initiale = {}
+                data_deschidere = nil
+                inchisa_inainte_pivot = true
+                break
+              end
+            else
+              # După pivot
+              rez = check_inchidere.call(row, process_type, conditii_initiale)
+              if rez
+                # Închisă după pivot
+                tranzactie_info[:atins], tranzactie_info[:closing_dt] = rez
+                # Închidem tranzacția
+                tranzactie_deschisa = false
+                process_type = nil
+                conditii_initiale = {}
+                data_deschidere = nil
+                inchisa_dupa_pivot = true
+                break
+              end
+            end
+          end
+  
+          if inchisa_inainte_pivot
+            # Tranzacția veche s-a închis înainte de pivot
+            # Putem acum iniția una nouă după pivot în aceeași zi
+            # Dar întâi, completăm ziua de start a tranzacției vechi cu datele de închidere
+            if tranzactie_info[:start_date] && tranzactie_info[:closing_dt]
+              # Actualizăm ziua de start a tranzacției vechi
+              sd = tranzactie_info[:start_date]
+              daily_data[sd][:atins] = tranzactie_info[:atins]
+              daily_data[sd][:closing_time] = tranzactie_info[:closing_dt].strftime('%Y-%m-%d %H:%M:%S')
+            end
+  
+            # Resetăm info tranzacție veche
+            tranzactie_info = { start_date: nil, atins: nil, closing_dt: nil }
+  
+            # Pornim tranzacția nouă după pivot
+            in_process = false
+            process_type_local = nil
+            minute_curente.each do |row|
+              next if row.timestamp.strftime('%H:%M') < @ora_pivot
+              unless in_process
+                if row.high >= zi[:entry_buy]
+                  in_process = true
+                  process_type_local = 'buy'
+                  tranzactie_deschisa = true
+                  process_type = 'buy'
+                  conditii_initiale = zi
+                  data_deschidere = current_date
+                  tranzactie_info[:start_date] = current_date
+                elsif row.low <= zi[:entry_sell]
+                  in_process = true
+                  process_type_local = 'sell'
+                  tranzactie_deschisa = true
+                  process_type = 'sell'
+                  conditii_initiale = zi
+                  data_deschidere = current_date
+                  tranzactie_info[:start_date] = current_date
+                else
+                  next
+                end
+              end
+  
+              if process_type_local
+                rez = check_inchidere.call(row, process_type_local, conditii_initiale)
+                if rez
+                  # Închisă în aceeași zi
+                  tranzactie_info[:atins], tranzactie_info[:closing_dt] = rez
+                  # Închidem tranzacția
+                  tranzactie_deschisa = false
+                  process_type = nil
+                  conditii_initiale = {}
+                  data_deschidere = nil
+  
+                  # Actualizăm ziua de start (care e current_date)
+                  sd = tranzactie_info[:start_date]
+                  daily_data[sd][:atins] = tranzactie_info[:atins]
+                  daily_data[sd][:closing_time] = tranzactie_info[:closing_dt].strftime('%Y-%m-%d %H:%M:%S')
+  
+                  # Reset info tranzacție
+                  tranzactie_info = { start_date: nil, atins: nil, closing_dt: nil }
+                  break
+                end
+              end
+            end
+  
+          elsif inchisa_dupa_pivot
+            # S-a închis după pivot
+            # Nu inițiem nimic nou azi.
+            # Actualizăm ziua de start a tranzacției
+            if tranzactie_info[:start_date] && tranzactie_info[:closing_dt]
+              sd = tranzactie_info[:start_date]
+              daily_data[sd][:atins] = tranzactie_info[:atins]
+              daily_data[sd][:closing_time] = tranzactie_info[:closing_dt].strftime('%Y-%m-%d %H:%M:%S')
+            end
+            tranzactie_info = { start_date: nil, atins: nil, closing_dt: nil }
+  
+          else
+            # Nu s-a închis deloc în ziua curentă
+            # Nimic nou, tranzacția continuă ziua următoare
+          end
+  
+        else
+          # Nu avem tranzacție veche deschisă la începutul zilei
+          in_process = false
+          process_type_local = nil
+          minute_curente.each do |row|
+            next if row.timestamp.strftime('%H:%M') < @ora_pivot
+            unless in_process
+              if row.high >= zi[:entry_buy]
+                in_process = true
+                process_type_local = 'buy'
+                tranzactie_deschisa = true
+                process_type = 'buy'
+                conditii_initiale = zi
+                data_deschidere = current_date
+                tranzactie_info[:start_date] = current_date
+              elsif row.low <= zi[:entry_sell]
+                in_process = true
+                process_type_local = 'sell'
+                tranzactie_deschisa = true
+                process_type = 'sell'
+                conditii_initiale = zi
+                data_deschidere = current_date
+                tranzactie_info[:start_date] = current_date
+              else
+                next
+              end
+            end
+  
+            if process_type_local
+              rez = check_inchidere.call(row, process_type_local, conditii_initiale)
+              if rez
+                # Închisă în aceeași zi
+                tranzactie_info[:atins], tranzactie_info[:closing_dt] = rez
+                # Închidem tranzacția
+                tranzactie_deschisa = false
+                process_type = nil
+                conditii_initiale = {}
+                data_deschidere = nil
+  
+                # Actualizăm ziua de start
+                sd = tranzactie_info[:start_date]
+                daily_data[sd][:atins] = tranzactie_info[:atins]
+                daily_data[sd][:closing_time] = tranzactie_info[:closing_dt].strftime('%Y-%m-%d %H:%M:%S')
+  
+                tranzactie_info = { start_date: nil, atins: nil, closing_dt: nil }
+                break
+              end
+            end
+          end
+          # Dacă nu s-a închis, rămâne deschisă
+        end
+      end
+  
+      # După ce am terminat toate zilele:
+      # Dacă mai există tranzacție deschisă și nu s-a închis niciodată, rămâne N/A la ziua de start.
+      # Dacă s-a închis, am actualizat deja ziua de start.
+  
+      # Convertim daily_data în array pentru afișare
+      @rezultate = daily_data.values.sort_by {|r| r[:date] }
+  
+      render :analiza_us30_tabel
+    end
   end
+  
   
   
   
