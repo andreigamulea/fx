@@ -1,0 +1,10 @@
+<p style="color: green"><%= notice %></p>
+
+<%= render @btc %>
+
+<div>
+  <%= link_to "Edit this btc", edit_btc_path(@btc) %> |
+  <%= link_to "Back to btcs", btcs_path %>
+
+  <%= button_to "Destroy this btc", @btc, method: :delete %>
+</div>

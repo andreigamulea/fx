@@ -1,0 +1,52 @@
+<%= form_with(model: btc) do |form| %>
+  <% if btc.errors.any? %>
+    <div style="color: red">
+      <h2><%= pluralize(btc.errors.count, "error") %> prohibited this btc from being saved:</h2>
+
+      <ul>
+        <% btc.errors.each do |error| %>
+          <li><%= error.full_message %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <div>
+    <%= form.label :date, style: "display: block" %>
+    <%= form.date_field :date %>
+  </div>
+
+  <div>
+    <%= form.label :timestamp, style: "display: block" %>
+    <%= form.time_field :timestamp %>
+  </div>
+
+  <div>
+    <%= form.label :open, style: "display: block" %>
+    <%= form.text_field :open %>
+  </div>
+
+  <div>
+    <%= form.label :high, style: "display: block" %>
+    <%= form.text_field :high %>
+  </div>
+
+  <div>
+    <%= form.label :low, style: "display: block" %>
+    <%= form.text_field :low %>
+  </div>
+
+  <div>
+    <%= form.label :close, style: "display: block" %>
+    <%= form.text_field :close %>
+  </div>
+
+  <div>
+    <%= form.label :volume, style: "display: block" %>
+    <%= form.text_field :volume %>
+  </div>
+
+  <div>
+    <%= form.submit %>
+  </div>
+<% end %>

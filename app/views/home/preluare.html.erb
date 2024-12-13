@@ -1,0 +1,24 @@
+<h1>Preluare</h1> 
+<h1>Comenzi pentru copiere Baza de date:</h1> 
+<h4>In cmd C:\fx pentru a obtine BD existenta in format fx_development.sql dau comanda:</h4>
+<h5>pg_dump -U postgres -d fx_development -F p --clean --if-exists -f fx_development.sql</h5>
+
+<h4>In cmd C:\fx pentru a instala noua BD este necesar sa am fisierul fx_development.sql in folderul fx si apoi dau comanda:</h4>
+<h5>psql -U postgres -d fx_development < fx_development.sql</h5>
+
+<%= link_to 'Mergi la Home', root_path, class: 'btn btn-primary' %><br><br>
+<%= link_to 'Preluare US30', preluare_us30_us30s_path, class: 'btn btn-primary' %><br>
+<%= link_to 'Importă Date din Excel US30 in continuare...', preluare_us30_cu_duplicat_us30s_path, class: 'btn btn-secondary' %>
+
+<%= link_to 'Importă Date din Excel BTC', preluare_btc_btcs_path, class: 'btn btn-success' %><br><br>
+<%= link_to 'Preluare BTC 1', preluare_btc_btcs1_path, class: 'btn btn-secondary' %><br><br>
+<%= link_to 'Preluare US30 (Loturi)', preluare_us30_us301s_path, class: 'btn btn-secondary' %><br><br>
+
+<%= link_to 'Preluare XAUUSD', preluare_xauusd_xauusds_path, class: 'btn btn-primary' %><br><br>
+
+
+<%= link_to 'Preluare XAUUSD Batch', preluare_xauusd1_xauusds_path, class: 'btn btn-primary' %><br><br>
+
+
+
+

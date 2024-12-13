@@ -1,0 +1,14 @@
+<p style="color: green"><%= notice %></p>
+
+<h1>Btcs</h1>
+
+<div id="btcs">
+  <% @btcs.each do |btc| %>
+    <%= render btc %>
+    <p>
+      <%= link_to "Show this btc", btc %>
+    </p>
+  <% end %>
+</div>
+
+<%= link_to "New btc", new_btc_path %>

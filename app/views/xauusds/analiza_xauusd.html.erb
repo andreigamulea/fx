@@ -1,0 +1,28 @@
+<%= form_with url: xauusds_analiza_xauusd_tabel_path, method: :post, local: true, data: { turbo: false } do |f| %>
+    <div class="mb-3">
+      <%= f.label :ora_inceput, "Ora de început:", class: "form-label" %>
+      <%= f.time_select :ora_inceput, default: { hour: 1, minute: 0, second: 0 }, class: "form-control" %>
+    </div>
+  
+    <div class="mb-3">
+      <%= f.label :ora_sfarsit, "Ora de sfârșit:", class: "form-label" %>
+      <%= f.time_select :ora_sfarsit, default: { hour: 13, minute: 9, second: 0 }, class: "form-control" %>
+    </div>
+  
+    <div class="mb-3">
+      <%= f.label :ora_pivot, "Ora pivot:", class: "form-label" %>
+      <%= f.time_select :ora_pivot, default: { hour: 13, minute: 10, second: 0 }, class: "form-control" %>
+    </div>
+  
+    <div class="mb-3">
+      <%= f.label :coeficient, "Coeficient:", class: "form-label" %>
+      <%= f.text_field :coeficient, value: "0.5", placeholder: "Ex: 0.5", class: "form-control" %>
+    </div>
+  
+    <div>
+      <%= f.submit "Analizează", class: 'btn btn-primary' %>
+    </div>
+  <% end %>
+  
+  <%= link_to 'Pagina Principală', root_path, class: "btn btn-secondary mt-3" %>
+  

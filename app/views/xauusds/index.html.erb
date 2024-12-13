@@ -1,0 +1,14 @@
+<p style="color: green"><%= notice %></p>
+
+<h1>Xauusds</h1>
+
+<div id="xauusds">
+  <% @xauusds.each do |xauusd| %>
+    <%= render xauusd %>
+    <p>
+      <%= link_to "Show this xauusd", xauusd %>
+    </p>
+  <% end %>
+</div>
+
+<%= link_to "New xauusd", new_xauusd_path %>

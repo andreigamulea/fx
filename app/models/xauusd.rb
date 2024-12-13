@@ -1,0 +1,2 @@
+class Xauusd < ApplicationRecord
+end
